@@ -19,7 +19,7 @@
                 </div>
             </div>
         </div>
-        <div class="row h-90 w-100">
+        <div class="row h-50 w-50">
             <div class="col-12 col-sm-6 d-flex justify-content-center">
                 <div class="embed-responsive embed-responsive-16by9">
                     <video class="embed-responsive-item" muted></video>
@@ -32,6 +32,17 @@
         </div>
     </div>
 
+    <div class="contentarea">
+    
+      <div class="camera">
+        <button id="startbutton">Take photo</button> 
+      </div>
+      <canvas id="canvas">
+      </canvas>
+      <div class="output">
+        <img id="photo" alt="The screen capture will appear in this box."> 
+      </div>
+    </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="bundle.js"></script>
 </body>

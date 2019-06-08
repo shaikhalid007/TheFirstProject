@@ -7526,7 +7526,12 @@ function config (name) {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],31:[function(require,module,exports){
-
+var width = 320;    // We will scale the photo width to this
+var height = 0;
+var streaming = false;
+canvas = document.getElementById('canvas');
+photo = document.getElementById('photo');
+startbutton = document.getElementById('startbutton');
 let Peer = require('simple-peer')
 let socket = io()
 const video = document.querySelector('video')
@@ -7539,8 +7544,32 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         video.srcObject = stream
         video.play()
 
-    
+        
+      
+          video.addEventListener('canplay', function(ev){
+            if (!streaming) {
+              height = video.videoHeight / (video.videoWidth/width);
+            
+              // Firefox currently has a bug where the height can't be read from
+              // the video, so we will make assumptions if this happens.
+            
+              if (isNaN(height)) {
+                height = width / (4/3);
+              }
+            
+              video.setAttribute('width', width);
+              video.setAttribute('height', height);
+              canvas.setAttribute('width', width);
+              canvas.setAttribute('height', height);
+              streaming = true;
+            }
+      }, false);
 
+      startbutton.addEventListener('click', function(ev){
+        takepicture();
+        ev.preventDefault();
+      }, false);
+      
         //used to initialize a peer
         function InitPeer(type) {
             let peer = new Peer({ initiator: (type == 'init') ? true : false, stream: stream, trickle: false })
@@ -7646,6 +7675,29 @@ checkboxTheme.addEventListener('click', () => {
     }
 }
 )
+
+function takepicture() {
+    var context = canvas.getContext('2d');
+    if (width && height) {
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(video, 0, 0, width, height);
+
+      var data = canvas.toDataURL('image/png');
+      photo.setAttribute('src', data);
+    } else {
+      clearphoto();
+    }
+  }
+
+  function clearphoto() {
+    var context = canvas.getContext('2d');
+    context.fillStyle = "#AAA";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    var data = canvas.toDataURL('image/png');
+    photo.setAttribute('src', data);
+  }
 
 function CreateDiv() {
     let div = document.createElement('div')
