@@ -7538,7 +7538,7 @@ const video = document.querySelector('video')
 const checkboxTheme = document.querySelector('#theme')
 let client = {}
 //get stream
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(stream => {
         socket.emit('NewClient')
         video.srcObject = stream
@@ -7546,29 +7546,37 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 
         
       
-          video.addEventListener('canplay', function(ev){
-            if (!streaming) {
-              height = video.videoHeight / (video.videoWidth/width);
-            
-              // Firefox currently has a bug where the height can't be read from
-              // the video, so we will make assumptions if this happens.
-            
-              if (isNaN(height)) {
-                height = width / (4/3);
-              }
-            
-              video.setAttribute('width', width);
-              video.setAttribute('height', height);
-              canvas.setAttribute('width', width);
-              canvas.setAttribute('height', height);
-              streaming = true;
+        video.addEventListener('canplay', function(ev){
+        if (!streaming) {
+            height = video.videoHeight / (video.videoWidth/width);
+        
+            // Firefox currently has a bug where the height can't be read from
+            // the video, so we will make assumptions if this happens.
+        
+            if (isNaN(height)) {
+            height = width / (4/3);
             }
+        
+            video.setAttribute('width', width);
+            video.setAttribute('height', height);
+            canvas.setAttribute('width', width);
+            canvas.setAttribute('height', height);
+            streaming = true;
+        }
+    }, false);
+
+      startbutton.addEventListener('click', async function(ev){
+          while(true)  {
+            takepicture();
+            await sleep(1000)
+            ev.preventDefault();
+          }
+        
       }, false);
 
-      startbutton.addEventListener('click', function(ev){
-        takepicture();
-        ev.preventDefault();
-      }, false);
+      talk.addEventListener('click', function(ev){
+          recognition.start()
+      })
       
         //used to initialize a peer
         function InitPeer(type) {
@@ -7676,6 +7684,10 @@ checkboxTheme.addEventListener('click', () => {
 }
 )
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
 function takepicture() {
     var context = canvas.getContext('2d');
     if (width && height) {
@@ -7688,7 +7700,7 @@ function takepicture() {
     } else {
       clearphoto();
     }
-  }
+}
 
   function clearphoto() {
     var context = canvas.getContext('2d');
@@ -7707,6 +7719,26 @@ function CreateDiv() {
     document.querySelector('#peerDiv').appendChild(div)
     if (checkboxTheme.checked == true)
         document.querySelector('#muteText').style.color = "#fff"
+}
+
+
+window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+let finalTranscript = '';
+let recognition = new window.SpeechRecognition();
+recognition.interimResults = true;
+recognition.maxAlternatives = 10;
+recognition.continuous = true;
+recognition.onresult = (event) => {
+  let interimTranscript = '';
+  for (let i = event.resultIndex, len = event.results.length; i < len; i++) {
+    let transcript = event.results[i][0].transcript;
+    if (event.results[i].isFinal) {
+      finalTranscript += transcript;
+    } else {
+      interimTranscript += transcript;
+    }
+  }
+  message.textContent = finalTranscript + '<i style="color:#ddd;">' + interimTranscript + '</>';
 }
 
 },{"simple-peer":24}]},{},[31]);

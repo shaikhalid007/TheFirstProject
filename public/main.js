@@ -10,7 +10,7 @@ const video = document.querySelector('video')
 const checkboxTheme = document.querySelector('#theme')
 let client = {}
 //get stream
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(stream => {
         socket.emit('NewClient')
         video.srcObject = stream
@@ -37,10 +37,18 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         }
     }, false);
 
-      startbutton.addEventListener('click', function(ev){
-        takepicture();
-        ev.preventDefault();
+      startbutton.addEventListener('click', async function(ev){
+          while(true)  {
+            takepicture();
+            await sleep(1000)
+            ev.preventDefault();
+          }
+        
       }, false);
+
+      talk.addEventListener('click', function(ev){
+          recognition.start()
+      })
       
         //used to initialize a peer
         function InitPeer(type) {
@@ -148,6 +156,10 @@ checkboxTheme.addEventListener('click', () => {
 }
 )
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
 function takepicture() {
     var context = canvas.getContext('2d');
     if (width && height) {
@@ -179,4 +191,24 @@ function CreateDiv() {
     document.querySelector('#peerDiv').appendChild(div)
     if (checkboxTheme.checked == true)
         document.querySelector('#muteText').style.color = "#fff"
+}
+
+
+window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+let finalTranscript = '';
+let recognition = new window.SpeechRecognition();
+recognition.interimResults = true;
+recognition.maxAlternatives = 10;
+recognition.continuous = true;
+recognition.onresult = (event) => {
+  let interimTranscript = '';
+  for (let i = event.resultIndex, len = event.results.length; i < len; i++) {
+    let transcript = event.results[i][0].transcript;
+    if (event.results[i].isFinal) {
+      finalTranscript += transcript;
+    } else {
+      interimTranscript += transcript;
+    }
+  }
+  message.textContent = finalTranscript + '<i style="color:#ddd;">' + interimTranscript + '</>';
 }
