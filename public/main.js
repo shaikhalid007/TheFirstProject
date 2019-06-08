@@ -47,7 +47,8 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }, false);
 
       talk.addEventListener('click', function(ev){
-          recognition.start()
+          console.log("recognition started");
+          recognition.start();
       })
       
         //used to initialize a peer
@@ -194,21 +195,24 @@ function CreateDiv() {
 }
 
 
-window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-let finalTranscript = '';
-let recognition = new window.SpeechRecognition();
-recognition.interimResults = true;
-recognition.maxAlternatives = 10;
-recognition.continuous = true;
-recognition.onresult = (event) => {
-  let interimTranscript = '';
-  for (let i = event.resultIndex, len = event.results.length; i < len; i++) {
-    let transcript = event.results[i][0].transcript;
-    if (event.results[i].isFinal) {
-      finalTranscript += transcript;
-    } else {
-      interimTranscript += transcript;
-    }
-  }
-  message.textContent = finalTranscript + '<i style="color:#ddd;">' + interimTranscript + '</>';
-}
+window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.interimResults = true;
+  recognition.lang = 'en-IN';
+  
+  let p = document.createElement('p');
+  const words = document.querySelector('.words');
+  words.appendChild(p);
+  recognition.addEventListener('result', e => {
+    const transcript = Array.from(e.results)
+      .map(result => result[0])
+      .map(result => result.transcript)
+      .join('');
+      const poopScript = transcript.replace(/poop|poo|shit|dump/gi, '💩');
+      p.textContent = poopScript;
+      if (e.results[0].isFinal) {
+        p = document.createElement('p');
+        words.appendChild(p);
+      }
+  });
+  recognition.addEventListener('end', recognition.start);
