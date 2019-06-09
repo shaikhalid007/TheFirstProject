@@ -9,6 +9,8 @@ let socket = io()
 const video = document.querySelector('video')
 const checkboxTheme = document.querySelector('#theme')
 let client = {}
+output = document.getElementById('output'),
+
 //get stream
 navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(stream => {
@@ -48,7 +50,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: false })
 
       talk.addEventListener('click', function(ev){
           console.log("recognition started");
-          recognition.start();
+          speechrecognition();
       })
       
         //used to initialize a peer
@@ -194,25 +196,25 @@ function CreateDiv() {
         document.querySelector('#muteText').style.color = "#fff"
 }
 
+/*speech recognition*/
+function speechrecognition(){
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.interimResults = true;
+    recognition.lang = 'en-IN';
 
-window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.interimResults = true;
-  recognition.lang = 'en-IN';
-  
-  let p = document.createElement('p');
-  const words = document.querySelector('.words');
-  words.appendChild(p);
-  recognition.addEventListener('result', e => {
-    const transcript = Array.from(e.results)
-      .map(result => result[0])
-      .map(result => result.transcript)
-      .join('');
-      const poopScript = transcript.replace(/poop|poo|shit|dump/gi, '💩');
-      p.textContent = poopScript;
-      if (e.results[0].isFinal) {
-        p = document.createElement('p');
-        words.appendChild(p);
-      }
-  });
-  recognition.addEventListener('end', recognition.start);
+    recognition.addEventListener('result', e => {
+        const transcript = Array.from(e.results)
+        .map(result => result[0])
+        .map(result => result.transcript)
+        .join('');
+        socket.emit('chat', transcript)       
+    });
+    recognition.addEventListener('end', recognition.start);
+    recognition.start();
+}
+
+socket.on('chat', function(data){
+    console.log(data)
+    output.innerHTML = data;
+});

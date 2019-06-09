@@ -21,6 +21,10 @@ io.on('connection', function (socket) {
     socket.on('Offer', SendOffer)
     socket.on('Answer', SendAnswer)
     socket.on('disconnect', Disconnect)
+
+    socket.on('chat', function(data){
+        io.sockets.emit('chat', data);
+    });
 })
 
 function Disconnect() {

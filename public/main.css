@@ -26,7 +26,19 @@ video {
     transform: translate(-50%, -50%);
 }
 
-.words {
+.myspeech {
+    max-width: 500px;
+    margin: 50px auto;
+    background: white;
+    border-radius: 5px;
+    box-shadow: 10px 10px 0 rgba(177, 165, 165, 0.1);
+    padding: 1rem 2rem 1rem 5rem;
+    background-size: 100% 3rem;
+    position: relative;
+    line-height: 3rem;
+  }
+  
+  .otherspeech {
     max-width: 500px;
     margin: 50px auto;
     background: white;
