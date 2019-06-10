@@ -18,19 +18,19 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         video.srcObject = stream
         video.play()
 
-        
-      
+
+
         video.addEventListener('canplay', function(ev){
         if (!streaming) {
             height = video.videoHeight / (video.videoWidth/width);
-        
+
             // Firefox currently has a bug where the height can't be read from
             // the video, so we will make assumptions if this happens.
-        
+
             if (isNaN(height)) {
             height = width / (4/3);
             }
-        
+
             video.setAttribute('width', width);
             video.setAttribute('height', height);
             canvas.setAttribute('width', width);
@@ -45,14 +45,14 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: false })
             await sleep(1000)
             ev.preventDefault();
           }
-        
+
       }, false);
 
       talk.addEventListener('click', function(ev){
           console.log("recognition started");
           speechrecognition();
       })
-      
+
         //used to initialize a peer
         function InitPeer(type) {
             let peer = new Peer({ initiator: (type == 'init') ? true : false, stream: stream, trickle: false })
@@ -208,7 +208,7 @@ function speechrecognition(){
         .map(result => result[0])
         .map(result => result.transcript)
         .join('');
-        socket.emit('chat', transcript)       
+        socket.emit('chat', transcript)
     });
     recognition.addEventListener('end', recognition.start);
     recognition.start();

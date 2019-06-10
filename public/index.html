@@ -1,53 +1,36 @@
-<html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-<head>
-    <title>Video Chat App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <link href="main.css" rel="stylesheet">
-</head>
-
-<body>
-    <div class="container-fluid">
-        <div class="row h-10 w-100">
-            <div class="col">
-                <div class="float-right mt-3">
-                    <input class="form-check-input" type="checkbox" id="theme">
-                    <label class="form-check-label" for="theme">
-                        Dark Theme
-                    </label>
+    <title>Sign Language VideoCalling</title>
+  </head>
+  <body>
+    <div class="container-responsive">
+        <div class="hovereffect">
+            <img class="img-responsive" src="https://theaggie.org/wp-content/uploads/2018/11/aslcourse_fe_OLIVIA-KOTLAREK_AGGIE-01.png", style="width:100%; height:auto; margin:0 auto;" alt="">
+                <div class="overlay">
+                    <h1>VIDEO CALLING FOR DEAF AND DUMB</h1>
+    				<p>
+    					<a href="#">A Real-Time Communication Platform</a>
+    				</p>
+            <p>
+    					<a href="#">baad me likhunga</a>
+    				</p>
+            <a class="btn btn-primary" href="index2.html" role="button">Get Started</a>
                 </div>
-            </div>
-        </div>
-        <div class="row h-50 w-50">
-            <div class="col-12 col-sm-6 d-flex justify-content-center">
-                <div class="embed-responsive embed-responsive-16by9">
-                    <video class="embed-responsive-item" muted></video>
-                </div>
-            </div>
-            <div class="col-12 col-sm-6 d-flex justify-content-center">
-                <div id="peerDiv" class="embed-responsive embed-responsive-16by9">
-                </div>
-            </div>
-        </div>
-        <div id="chat-window">
-            <div id="output"></div>
         </div>
     </div>
-    <div class="contentarea">
-    
-      <div class="camera">
-        <button id="startbutton">Take photo</button> 
-        <button id="talk">Talk</button>
-      </div>
-      <canvas id="canvas">
-      </canvas>
-      <div class="output">
-        <img id="photo" alt="The screen capture will appear in this box."> 
-      </div>
-    </div>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="bundle.js"></script>
-</body>
 
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+  </body>
 </html>

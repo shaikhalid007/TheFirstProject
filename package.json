@@ -1,20 +1,21 @@
 {
-  "name": "simple-videochat-webrtc",
+  "name": "asl-video-calling",
   "version": "1.0.0",
   "description": "Video Chat between 2 people using simple-peer",
   "main": "main.js",
   "scripts": {
     "start": "node server.js",
-    "watch": "npx watchify ./public/main.js -o ./public/bundle.js"
+    "watch": "npx watchify ./public/main.js -o ./public/bundle.js",
+    "watchnormal": "npx watchify ./public/mainnormal.js -o ./public/bundle1.js"
   },
-  "author": "Vinayak Sinha",
+  "author": "team crce",
   "dependencies": {
-    "express": "^4.16.4",
-    "simple-peer": "^9.2.1",
+    "express": "^4.17.1",
+    "simple-peer": "^9.3.0",
     "socket.io": "^2.2.0"
   },
   "devDependencies": {
-    "watchify": "^3.11.1",
-    "browser-sync": "^2.12.5 <2.23.2"
+    "browser-sync": "^2.23.1",
+    "watchify": "^3.11.1"
   }
 }
