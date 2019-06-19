@@ -12,6 +12,7 @@ io.on('connection', function (socket) {
         if (clients < 2) {
             if (clients == 1) {
                 this.emit('CreatePeer')
+                console.log("initializing peer")
             }
         }
         else

@@ -3016,7 +3016,7 @@ function randomBytes (size, cb) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":12,"safe-buffer":23}],14:[function(require,module,exports){
+},{"_process":12,"safe-buffer":24}],14:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -4218,7 +4218,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":14,"./internal/streams/BufferList":19,"./internal/streams/destroy":20,"./internal/streams/stream":21,"_process":12,"core-util-is":4,"events":5,"inherits":8,"isarray":10,"process-nextick-args":11,"safe-buffer":23,"string_decoder/":28,"util":2}],17:[function(require,module,exports){
+},{"./_stream_duplex":14,"./internal/streams/BufferList":19,"./internal/streams/destroy":20,"./internal/streams/stream":21,"_process":12,"core-util-is":4,"events":5,"inherits":8,"isarray":10,"process-nextick-args":11,"safe-buffer":24,"string_decoder/":22,"util":2}],17:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5123,7 +5123,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
-},{"./_stream_duplex":14,"./internal/streams/destroy":20,"./internal/streams/stream":21,"_process":12,"core-util-is":4,"inherits":8,"process-nextick-args":11,"safe-buffer":23,"timers":29,"util-deprecate":30}],19:[function(require,module,exports){
+},{"./_stream_duplex":14,"./internal/streams/destroy":20,"./internal/streams/stream":21,"_process":12,"core-util-is":4,"inherits":8,"process-nextick-args":11,"safe-buffer":24,"timers":29,"util-deprecate":30}],19:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -5203,7 +5203,7 @@ if (util && util.inspect && util.inspect.custom) {
     return this.constructor.name + ' ' + obj;
   };
 }
-},{"safe-buffer":23,"util":2}],20:[function(require,module,exports){
+},{"safe-buffer":24,"util":2}],20:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -5282,6 +5282,303 @@ module.exports = {
 module.exports = require('events').EventEmitter;
 
 },{"events":5}],22:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+'use strict';
+
+/*<replacement>*/
+
+var Buffer = require('safe-buffer').Buffer;
+/*</replacement>*/
+
+var isEncoding = Buffer.isEncoding || function (encoding) {
+  encoding = '' + encoding;
+  switch (encoding && encoding.toLowerCase()) {
+    case 'hex':case 'utf8':case 'utf-8':case 'ascii':case 'binary':case 'base64':case 'ucs2':case 'ucs-2':case 'utf16le':case 'utf-16le':case 'raw':
+      return true;
+    default:
+      return false;
+  }
+};
+
+function _normalizeEncoding(enc) {
+  if (!enc) return 'utf8';
+  var retried;
+  while (true) {
+    switch (enc) {
+      case 'utf8':
+      case 'utf-8':
+        return 'utf8';
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return 'utf16le';
+      case 'latin1':
+      case 'binary':
+        return 'latin1';
+      case 'base64':
+      case 'ascii':
+      case 'hex':
+        return enc;
+      default:
+        if (retried) return; // undefined
+        enc = ('' + enc).toLowerCase();
+        retried = true;
+    }
+  }
+};
+
+// Do not cache `Buffer.isEncoding` when checking encoding names as some
+// modules monkey-patch it to support additional encodings
+function normalizeEncoding(enc) {
+  var nenc = _normalizeEncoding(enc);
+  if (typeof nenc !== 'string' && (Buffer.isEncoding === isEncoding || !isEncoding(enc))) throw new Error('Unknown encoding: ' + enc);
+  return nenc || enc;
+}
+
+// StringDecoder provides an interface for efficiently splitting a series of
+// buffers into a series of JS strings without breaking apart multi-byte
+// characters.
+exports.StringDecoder = StringDecoder;
+function StringDecoder(encoding) {
+  this.encoding = normalizeEncoding(encoding);
+  var nb;
+  switch (this.encoding) {
+    case 'utf16le':
+      this.text = utf16Text;
+      this.end = utf16End;
+      nb = 4;
+      break;
+    case 'utf8':
+      this.fillLast = utf8FillLast;
+      nb = 4;
+      break;
+    case 'base64':
+      this.text = base64Text;
+      this.end = base64End;
+      nb = 3;
+      break;
+    default:
+      this.write = simpleWrite;
+      this.end = simpleEnd;
+      return;
+  }
+  this.lastNeed = 0;
+  this.lastTotal = 0;
+  this.lastChar = Buffer.allocUnsafe(nb);
+}
+
+StringDecoder.prototype.write = function (buf) {
+  if (buf.length === 0) return '';
+  var r;
+  var i;
+  if (this.lastNeed) {
+    r = this.fillLast(buf);
+    if (r === undefined) return '';
+    i = this.lastNeed;
+    this.lastNeed = 0;
+  } else {
+    i = 0;
+  }
+  if (i < buf.length) return r ? r + this.text(buf, i) : this.text(buf, i);
+  return r || '';
+};
+
+StringDecoder.prototype.end = utf8End;
+
+// Returns only complete characters in a Buffer
+StringDecoder.prototype.text = utf8Text;
+
+// Attempts to complete a partial non-UTF-8 character using bytes from a Buffer
+StringDecoder.prototype.fillLast = function (buf) {
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, buf.length);
+  this.lastNeed -= buf.length;
+};
+
+// Checks the type of a UTF-8 byte, whether it's ASCII, a leading byte, or a
+// continuation byte. If an invalid byte is detected, -2 is returned.
+function utf8CheckByte(byte) {
+  if (byte <= 0x7F) return 0;else if (byte >> 5 === 0x06) return 2;else if (byte >> 4 === 0x0E) return 3;else if (byte >> 3 === 0x1E) return 4;
+  return byte >> 6 === 0x02 ? -1 : -2;
+}
+
+// Checks at most 3 bytes at the end of a Buffer in order to detect an
+// incomplete multi-byte UTF-8 character. The total number of bytes (2, 3, or 4)
+// needed to complete the UTF-8 character (if applicable) are returned.
+function utf8CheckIncomplete(self, buf, i) {
+  var j = buf.length - 1;
+  if (j < i) return 0;
+  var nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 1;
+    return nb;
+  }
+  if (--j < i || nb === -2) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) self.lastNeed = nb - 2;
+    return nb;
+  }
+  if (--j < i || nb === -2) return 0;
+  nb = utf8CheckByte(buf[j]);
+  if (nb >= 0) {
+    if (nb > 0) {
+      if (nb === 2) nb = 0;else self.lastNeed = nb - 3;
+    }
+    return nb;
+  }
+  return 0;
+}
+
+// Validates as many continuation bytes for a multi-byte UTF-8 character as
+// needed or are available. If we see a non-continuation byte where we expect
+// one, we "replace" the validated continuation bytes we've seen so far with
+// a single UTF-8 replacement character ('\ufffd'), to match v8's UTF-8 decoding
+// behavior. The continuation byte check is included three times in the case
+// where all of the continuation bytes for a character exist in the same buffer.
+// It is also done this way as a slight performance increase instead of using a
+// loop.
+function utf8CheckExtraBytes(self, buf, p) {
+  if ((buf[0] & 0xC0) !== 0x80) {
+    self.lastNeed = 0;
+    return '\ufffd';
+  }
+  if (self.lastNeed > 1 && buf.length > 1) {
+    if ((buf[1] & 0xC0) !== 0x80) {
+      self.lastNeed = 1;
+      return '\ufffd';
+    }
+    if (self.lastNeed > 2 && buf.length > 2) {
+      if ((buf[2] & 0xC0) !== 0x80) {
+        self.lastNeed = 2;
+        return '\ufffd';
+      }
+    }
+  }
+}
+
+// Attempts to complete a multi-byte UTF-8 character using bytes from a Buffer.
+function utf8FillLast(buf) {
+  var p = this.lastTotal - this.lastNeed;
+  var r = utf8CheckExtraBytes(this, buf, p);
+  if (r !== undefined) return r;
+  if (this.lastNeed <= buf.length) {
+    buf.copy(this.lastChar, p, 0, this.lastNeed);
+    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
+  }
+  buf.copy(this.lastChar, p, 0, buf.length);
+  this.lastNeed -= buf.length;
+}
+
+// Returns all complete UTF-8 characters in a Buffer. If the Buffer ended on a
+// partial character, the character's bytes are buffered until the required
+// number of bytes are available.
+function utf8Text(buf, i) {
+  var total = utf8CheckIncomplete(this, buf, i);
+  if (!this.lastNeed) return buf.toString('utf8', i);
+  this.lastTotal = total;
+  var end = buf.length - (total - this.lastNeed);
+  buf.copy(this.lastChar, 0, end);
+  return buf.toString('utf8', i, end);
+}
+
+// For UTF-8, a replacement character is added when ending on a partial
+// character.
+function utf8End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + '\ufffd';
+  return r;
+}
+
+// UTF-16LE typically needs two bytes per character, but even if we have an even
+// number of bytes available, we need to check if we end on a leading/high
+// surrogate. In that case, we need to wait for the next two bytes in order to
+// decode the last character properly.
+function utf16Text(buf, i) {
+  if ((buf.length - i) % 2 === 0) {
+    var r = buf.toString('utf16le', i);
+    if (r) {
+      var c = r.charCodeAt(r.length - 1);
+      if (c >= 0xD800 && c <= 0xDBFF) {
+        this.lastNeed = 2;
+        this.lastTotal = 4;
+        this.lastChar[0] = buf[buf.length - 2];
+        this.lastChar[1] = buf[buf.length - 1];
+        return r.slice(0, -1);
+      }
+    }
+    return r;
+  }
+  this.lastNeed = 1;
+  this.lastTotal = 2;
+  this.lastChar[0] = buf[buf.length - 1];
+  return buf.toString('utf16le', i, buf.length - 1);
+}
+
+// For UTF-16LE we do not explicitly append special replacement characters if we
+// end on a partial character, we simply let v8 handle that.
+function utf16End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) {
+    var end = this.lastTotal - this.lastNeed;
+    return r + this.lastChar.toString('utf16le', 0, end);
+  }
+  return r;
+}
+
+function base64Text(buf, i) {
+  var n = (buf.length - i) % 3;
+  if (n === 0) return buf.toString('base64', i);
+  this.lastNeed = 3 - n;
+  this.lastTotal = 3;
+  if (n === 1) {
+    this.lastChar[0] = buf[buf.length - 1];
+  } else {
+    this.lastChar[0] = buf[buf.length - 2];
+    this.lastChar[1] = buf[buf.length - 1];
+  }
+  return buf.toString('base64', i, buf.length - n);
+}
+
+function base64End(buf) {
+  var r = buf && buf.length ? this.write(buf) : '';
+  if (this.lastNeed) return r + this.lastChar.toString('base64', 0, 3 - this.lastNeed);
+  return r;
+}
+
+// Pass bytes on through for single-byte encodings (e.g. ascii, latin1, hex)
+function simpleWrite(buf) {
+  return buf.toString(this.encoding);
+}
+
+function simpleEnd(buf) {
+  return buf && buf.length ? this.write(buf) : '';
+}
+},{"safe-buffer":24}],23:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -5290,7 +5587,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":14,"./lib/_stream_passthrough.js":15,"./lib/_stream_readable.js":16,"./lib/_stream_transform.js":17,"./lib/_stream_writable.js":18}],23:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":14,"./lib/_stream_passthrough.js":15,"./lib/_stream_readable.js":16,"./lib/_stream_transform.js":17,"./lib/_stream_writable.js":18}],24:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -5354,7 +5651,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":3}],24:[function(require,module,exports){
+},{"buffer":3}],25:[function(require,module,exports){
 (function (Buffer){
 module.exports = Peer
 
@@ -6378,7 +6675,7 @@ function makeError (message, code) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":3,"debug":25,"get-browser-rtc":6,"inherits":8,"randombytes":13,"readable-stream":22}],25:[function(require,module,exports){
+},{"buffer":3,"debug":26,"get-browser-rtc":6,"inherits":8,"randombytes":13,"readable-stream":23}],26:[function(require,module,exports){
 (function (process){
 /* eslint-env browser */
 
@@ -6646,7 +6943,7 @@ formatters.j = function (v) {
 };
 
 }).call(this,require('_process'))
-},{"./common":26,"_process":12}],26:[function(require,module,exports){
+},{"./common":27,"_process":12}],27:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -6914,7 +7211,7 @@ function setup(env) {
 
 module.exports = setup;
 
-},{"ms":27}],27:[function(require,module,exports){
+},{"ms":28}],28:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -7078,304 +7375,7 @@ function plural(ms, msAbs, n, name) {
   return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
 
-},{}],28:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-'use strict';
-
-/*<replacement>*/
-
-var Buffer = require('safe-buffer').Buffer;
-/*</replacement>*/
-
-var isEncoding = Buffer.isEncoding || function (encoding) {
-  encoding = '' + encoding;
-  switch (encoding && encoding.toLowerCase()) {
-    case 'hex':case 'utf8':case 'utf-8':case 'ascii':case 'binary':case 'base64':case 'ucs2':case 'ucs-2':case 'utf16le':case 'utf-16le':case 'raw':
-      return true;
-    default:
-      return false;
-  }
-};
-
-function _normalizeEncoding(enc) {
-  if (!enc) return 'utf8';
-  var retried;
-  while (true) {
-    switch (enc) {
-      case 'utf8':
-      case 'utf-8':
-        return 'utf8';
-      case 'ucs2':
-      case 'ucs-2':
-      case 'utf16le':
-      case 'utf-16le':
-        return 'utf16le';
-      case 'latin1':
-      case 'binary':
-        return 'latin1';
-      case 'base64':
-      case 'ascii':
-      case 'hex':
-        return enc;
-      default:
-        if (retried) return; // undefined
-        enc = ('' + enc).toLowerCase();
-        retried = true;
-    }
-  }
-};
-
-// Do not cache `Buffer.isEncoding` when checking encoding names as some
-// modules monkey-patch it to support additional encodings
-function normalizeEncoding(enc) {
-  var nenc = _normalizeEncoding(enc);
-  if (typeof nenc !== 'string' && (Buffer.isEncoding === isEncoding || !isEncoding(enc))) throw new Error('Unknown encoding: ' + enc);
-  return nenc || enc;
-}
-
-// StringDecoder provides an interface for efficiently splitting a series of
-// buffers into a series of JS strings without breaking apart multi-byte
-// characters.
-exports.StringDecoder = StringDecoder;
-function StringDecoder(encoding) {
-  this.encoding = normalizeEncoding(encoding);
-  var nb;
-  switch (this.encoding) {
-    case 'utf16le':
-      this.text = utf16Text;
-      this.end = utf16End;
-      nb = 4;
-      break;
-    case 'utf8':
-      this.fillLast = utf8FillLast;
-      nb = 4;
-      break;
-    case 'base64':
-      this.text = base64Text;
-      this.end = base64End;
-      nb = 3;
-      break;
-    default:
-      this.write = simpleWrite;
-      this.end = simpleEnd;
-      return;
-  }
-  this.lastNeed = 0;
-  this.lastTotal = 0;
-  this.lastChar = Buffer.allocUnsafe(nb);
-}
-
-StringDecoder.prototype.write = function (buf) {
-  if (buf.length === 0) return '';
-  var r;
-  var i;
-  if (this.lastNeed) {
-    r = this.fillLast(buf);
-    if (r === undefined) return '';
-    i = this.lastNeed;
-    this.lastNeed = 0;
-  } else {
-    i = 0;
-  }
-  if (i < buf.length) return r ? r + this.text(buf, i) : this.text(buf, i);
-  return r || '';
-};
-
-StringDecoder.prototype.end = utf8End;
-
-// Returns only complete characters in a Buffer
-StringDecoder.prototype.text = utf8Text;
-
-// Attempts to complete a partial non-UTF-8 character using bytes from a Buffer
-StringDecoder.prototype.fillLast = function (buf) {
-  if (this.lastNeed <= buf.length) {
-    buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, this.lastNeed);
-    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
-  }
-  buf.copy(this.lastChar, this.lastTotal - this.lastNeed, 0, buf.length);
-  this.lastNeed -= buf.length;
-};
-
-// Checks the type of a UTF-8 byte, whether it's ASCII, a leading byte, or a
-// continuation byte. If an invalid byte is detected, -2 is returned.
-function utf8CheckByte(byte) {
-  if (byte <= 0x7F) return 0;else if (byte >> 5 === 0x06) return 2;else if (byte >> 4 === 0x0E) return 3;else if (byte >> 3 === 0x1E) return 4;
-  return byte >> 6 === 0x02 ? -1 : -2;
-}
-
-// Checks at most 3 bytes at the end of a Buffer in order to detect an
-// incomplete multi-byte UTF-8 character. The total number of bytes (2, 3, or 4)
-// needed to complete the UTF-8 character (if applicable) are returned.
-function utf8CheckIncomplete(self, buf, i) {
-  var j = buf.length - 1;
-  if (j < i) return 0;
-  var nb = utf8CheckByte(buf[j]);
-  if (nb >= 0) {
-    if (nb > 0) self.lastNeed = nb - 1;
-    return nb;
-  }
-  if (--j < i || nb === -2) return 0;
-  nb = utf8CheckByte(buf[j]);
-  if (nb >= 0) {
-    if (nb > 0) self.lastNeed = nb - 2;
-    return nb;
-  }
-  if (--j < i || nb === -2) return 0;
-  nb = utf8CheckByte(buf[j]);
-  if (nb >= 0) {
-    if (nb > 0) {
-      if (nb === 2) nb = 0;else self.lastNeed = nb - 3;
-    }
-    return nb;
-  }
-  return 0;
-}
-
-// Validates as many continuation bytes for a multi-byte UTF-8 character as
-// needed or are available. If we see a non-continuation byte where we expect
-// one, we "replace" the validated continuation bytes we've seen so far with
-// a single UTF-8 replacement character ('\ufffd'), to match v8's UTF-8 decoding
-// behavior. The continuation byte check is included three times in the case
-// where all of the continuation bytes for a character exist in the same buffer.
-// It is also done this way as a slight performance increase instead of using a
-// loop.
-function utf8CheckExtraBytes(self, buf, p) {
-  if ((buf[0] & 0xC0) !== 0x80) {
-    self.lastNeed = 0;
-    return '\ufffd';
-  }
-  if (self.lastNeed > 1 && buf.length > 1) {
-    if ((buf[1] & 0xC0) !== 0x80) {
-      self.lastNeed = 1;
-      return '\ufffd';
-    }
-    if (self.lastNeed > 2 && buf.length > 2) {
-      if ((buf[2] & 0xC0) !== 0x80) {
-        self.lastNeed = 2;
-        return '\ufffd';
-      }
-    }
-  }
-}
-
-// Attempts to complete a multi-byte UTF-8 character using bytes from a Buffer.
-function utf8FillLast(buf) {
-  var p = this.lastTotal - this.lastNeed;
-  var r = utf8CheckExtraBytes(this, buf, p);
-  if (r !== undefined) return r;
-  if (this.lastNeed <= buf.length) {
-    buf.copy(this.lastChar, p, 0, this.lastNeed);
-    return this.lastChar.toString(this.encoding, 0, this.lastTotal);
-  }
-  buf.copy(this.lastChar, p, 0, buf.length);
-  this.lastNeed -= buf.length;
-}
-
-// Returns all complete UTF-8 characters in a Buffer. If the Buffer ended on a
-// partial character, the character's bytes are buffered until the required
-// number of bytes are available.
-function utf8Text(buf, i) {
-  var total = utf8CheckIncomplete(this, buf, i);
-  if (!this.lastNeed) return buf.toString('utf8', i);
-  this.lastTotal = total;
-  var end = buf.length - (total - this.lastNeed);
-  buf.copy(this.lastChar, 0, end);
-  return buf.toString('utf8', i, end);
-}
-
-// For UTF-8, a replacement character is added when ending on a partial
-// character.
-function utf8End(buf) {
-  var r = buf && buf.length ? this.write(buf) : '';
-  if (this.lastNeed) return r + '\ufffd';
-  return r;
-}
-
-// UTF-16LE typically needs two bytes per character, but even if we have an even
-// number of bytes available, we need to check if we end on a leading/high
-// surrogate. In that case, we need to wait for the next two bytes in order to
-// decode the last character properly.
-function utf16Text(buf, i) {
-  if ((buf.length - i) % 2 === 0) {
-    var r = buf.toString('utf16le', i);
-    if (r) {
-      var c = r.charCodeAt(r.length - 1);
-      if (c >= 0xD800 && c <= 0xDBFF) {
-        this.lastNeed = 2;
-        this.lastTotal = 4;
-        this.lastChar[0] = buf[buf.length - 2];
-        this.lastChar[1] = buf[buf.length - 1];
-        return r.slice(0, -1);
-      }
-    }
-    return r;
-  }
-  this.lastNeed = 1;
-  this.lastTotal = 2;
-  this.lastChar[0] = buf[buf.length - 1];
-  return buf.toString('utf16le', i, buf.length - 1);
-}
-
-// For UTF-16LE we do not explicitly append special replacement characters if we
-// end on a partial character, we simply let v8 handle that.
-function utf16End(buf) {
-  var r = buf && buf.length ? this.write(buf) : '';
-  if (this.lastNeed) {
-    var end = this.lastTotal - this.lastNeed;
-    return r + this.lastChar.toString('utf16le', 0, end);
-  }
-  return r;
-}
-
-function base64Text(buf, i) {
-  var n = (buf.length - i) % 3;
-  if (n === 0) return buf.toString('base64', i);
-  this.lastNeed = 3 - n;
-  this.lastTotal = 3;
-  if (n === 1) {
-    this.lastChar[0] = buf[buf.length - 1];
-  } else {
-    this.lastChar[0] = buf[buf.length - 2];
-    this.lastChar[1] = buf[buf.length - 1];
-  }
-  return buf.toString('base64', i, buf.length - n);
-}
-
-function base64End(buf) {
-  var r = buf && buf.length ? this.write(buf) : '';
-  if (this.lastNeed) return r + this.lastChar.toString('base64', 0, 3 - this.lastNeed);
-  return r;
-}
-
-// Pass bytes on through for single-byte encodings (e.g. ascii, latin1, hex)
-function simpleWrite(buf) {
-  return buf.toString(this.encoding);
-}
-
-function simpleEnd(buf) {
-  return buf && buf.length ? this.write(buf) : '';
-}
-},{"safe-buffer":23}],29:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -7526,225 +7526,754 @@ function config (name) {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],31:[function(require,module,exports){
-var width = 320;    // We will scale the photo width to this
-var height = 0;
-var streaming = false;
-canvas = document.getElementById('canvas');
-photo = document.getElementById('photo');
-startbutton = document.getElementById('startbutton');
-let Peer = require('simple-peer')
-let socket = io()
-const video = document.querySelector('video')
-const checkboxTheme = document.querySelector('#theme')
-let client = {}
-output = document.getElementById('output'),
+'use strict';
 
-//get stream
-navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    .then(stream => {
-        socket.emit('NewClient')
-        video.srcObject = stream
-        video.play()
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var video = document.querySelector('video');
+var canvas1 = document.getElementById('canvas1');
+var ctx1 = canvas1.getContext("2d");
+var canvas2 = document.getElementById('canvas2');
+var ctx2 = canvas2.getContext("2d");
+var blueSlider = document.getElementById("blueRange");
+var blueValue = document.getElementById("blueValue");
+blueValue.innerHTML = blueSlider.value;
+
+//const skinColorUpper = hue => new cv.Vec(hue, 0.8 * 255, 0.6 * 255);
+//const skinColorLower = hue => new cv.Vec(hue, 0.1 * 255, 0.05 * 255);
 
 
+var knn;
+var featureExtractor;
 
-        video.addEventListener('canplay', function(ev){
-        if (!streaming) {
-            height = video.videoHeight / (video.videoWidth/width);
+function setupCamera() {
+    var stream;
+    return regeneratorRuntime.async(function setupCamera$(_context2) {
+        while (1) {
+            switch (_context2.prev = _context2.next) {
+                case 0:
+                    if (!(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
+                        _context2.next = 2;
+                        break;
+                    }
 
-            // Firefox currently has a bug where the height can't be read from
-            // the video, so we will make assumptions if this happens.
+                    throw new Error('Browser API navigator.mediaDevices.getUserMedia not available');
 
-            if (isNaN(height)) {
-            height = width / (4/3);
+                case 2:
+                    video.width = IMAGE_SIZE;
+                    video.height = IMAGE_SIZE;
+                    _context2.next = 6;
+                    return regeneratorRuntime.awrap(navigator.mediaDevices.getUserMedia({
+                        'audio': false,
+                        'video': true
+                    }));
+
+                case 6:
+                    stream = _context2.sent;
+
+                    video.srcObject = stream;
+                    gstream = stream;
+
+                    video.addEventListener('play', function _callee() {
+                        var $this;
+                        return regeneratorRuntime.async(function _callee$(_context) {
+                            while (1) {
+                                switch (_context.prev = _context.next) {
+                                    case 0:
+                                        $this = this; //cache
+
+                                        (function loop() {
+                                            if (!$this.paused && !$this.ended) {
+                                                ctx1.drawImage($this, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
+                                                computeFrame();
+                                                setTimeout(loop, 1000 / 30); // drawing at 30fps
+                                            }
+                                        })();
+
+                                    case 2:
+                                    case 'end':
+                                        return _context.stop();
+                                }
+                            }
+                        }, null, this);
+                    });
+
+                    return _context2.abrupt('return', new Promise(function (resolve) {
+                        video.onloadedmetadata = function () {
+                            resolve(video);
+                        };
+                    }));
+
+                case 11:
+                case 'end':
+                    return _context2.stop();
+            }
+        }
+    }, null, this);
+}
+
+function computeFrame() {
+    /*
+    let frame = ctx1.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE);
+        let l = frame.data.length / 4;
+      for (let i = 0; i < l; i++) {
+      let r = frame.data[i * 4 + 0];
+      let g = frame.data[i * 4 + 1];
+      let b = frame.data[i * 4 + 2];
+      if (g > 50 && r > 50 && b < 43)
+        frame.data[i * 4 + 3] = 0;
+    }
+    ctx2.putImageData(frame, 0, 0);
+    return;*/
+    var frame = cv.imread(canvas1);
+    cv.imshow('canvas2', makeHandMask(frame));
+}
+
+var makeHandMask = function makeHandMask(img) {
+    // filter by skin color
+    cv.cvtColor(img, img, cv.COLOR_BGR2HLS);
+    var low = new cv.Mat(img.rows, img.cols, img.type(), [0, 0.1 * 255, 0.05 * 255, 0]);
+    var high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), 0.8 * 255, 0.6 * 255, 255]);
+    cv.inRange(img, low, high, img);
+    cv.medianBlur(img, img, 5);
+    cv.threshold(img, img, 200, 255, cv.THRESH_BINARY);
+    return img;
+};
+
+var IMAGE_SIZE = 224;
+var Peer = require('simple-peer');
+var socket = io();
+var client = {};
+var gstream = null;
+/*navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+.then(stream => {
+    gstream = stream;
+    video.srcObject = stream;
+    video.width = IMAGE_SIZE;
+    video.height = IMAGE_SIZE;
+});*/
+
+//import {KNNImageClassifier} from 'deeplearn-knn-image-classifier';
+//import * as dl from 'deeplearn';
+
+
+//import { constant } from '@tensorflow/tfjs-layers/dist/exports_initializers';
+
+
+var TOPK = 10;
+
+var predictionThreshold = 0.99999999;
+
+var words = ['hello', 'send', 'other'];
+var name = null;
+
+var Main = function () {
+    function Main() {
+        var _this = this;
+
+        _classCallCheck(this, Main);
+
+        this.meassage = [];
+        this.wcs = document.getElementsByClassName("wcs");
+        this.ddMode = document.getElementById("dd-mode");
+        this.normalMode = document.getElementById("normal-mode");
+        this.mode = null;
+        this.trainingListDiv = document.getElementById("training-list");
+
+        this.predResults = document.getElementById("subs");
+
+        this.infoTexts = [];
+        this.training = -1; // -1 when no class is being trained
+        this.videoPlaying = false;
+
+        this.previousPrediction = -1;
+        this.currentPredictedWords = [];
+        this.round = 0;
+
+        // variables to restrict prediction rate
+        this.now;
+        this.then = Date.now();
+        this.startTime = this.then;
+        this.fps = 25; //framerate - number of prediction per second
+        this.fpsInterval = 1000 / this.fps;
+        this.elapsed = 0;
+
+        this.trainingListDiv = document.getElementById("training-list");
+        this.exampleListDiv = document.getElementById("example-list");
+
+        //knn = null
+        //featureExtractor = null
+
+
+        // Get video element that will contain the webcam image
+
+        this.addWordForm = document.getElementById("add-word");
+
+        // add word to training example set
+        this.addWordForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var word = document.getElementById("new-word").value.trim().toLowerCase();
+
+            if (word && !words.includes(word)) {
+                //console.log(word)
+                words.splice(words.length - 1, 0, word); //insert at penultimate index in array
+                _this.createButtonList(false);
+                _this.updateExampleCount();
+                //console.log(words)
+
+                document.getElementById("new-word").value = '';
+
+                // console.log(words)
+            } else {
+                alert("Duplicate word or no word entered");
             }
 
-            video.setAttribute('width', width);
-            video.setAttribute('height', height);
-            canvas.setAttribute('width', width);
-            canvas.setAttribute('height', height);
-            streaming = true;
-        }
-    }, false);
+            return;
+        });
 
-      startbutton.addEventListener('click', async function(ev){
-          while(true)  {
-            takepicture();
-            await sleep(1000)
-            ev.preventDefault();
-          }
+        this.updateExampleCount();
 
-      }, false);
+        this.createTrainingBtn();
 
-      talk.addEventListener('click', function(ev){
-          console.log("recognition started");
-          speechrecognition();
-      })
+        this.createButtonList(false);
+    }
 
-        //used to initialize a peer
-        function InitPeer(type) {
-            let peer = new Peer({ initiator: (type == 'init') ? true : false, stream: stream, trickle: false })
-            peer.on('stream', function (stream) {
-                CreateVideo(stream)
-            })
-            //This isn't working in chrome; works perfectly in firefox.
-            // peer.on('close', function () {
-            //     document.getElementById("peerVideo").remove();
-            //     peer.destroy()
-            // })
-            peer.on('data', function (data) {
-                let decodedData = new TextDecoder('utf-8').decode(data)
-                let peervideo = document.querySelector('#peerVideo')
-            })
-            return peer
-        }
+    _createClass(Main, [{
+        key: 'welcomeScreen',
+        value: function welcomeScreen() {
+            var _this2 = this;
 
-        //for peer of type init
-        function MakePeer() {
-            client.gotAnswer = false
-            let peer = InitPeer('init')
-            peer.on('signal', function (data) {
-                if (!client.gotAnswer) {
-                    socket.emit('Offer', data)
+            this.trainingListDiv.style.display = "none";
+            video.style.display = "none";
+            this.ddMode.addEventListener("click", function () {
+                console.log("mode: deaf-dumb");
+                for (var i = 0; i < _this2.wcs.length; i += 1) {
+                    _this2.wcs[i].style.display = 'none';
                 }
-            })
-            client.peer = peer
+                var nameInput = document.getElementById("name");
+                name = nameInput.value;
+                name = name.toUpperCase() + ": ";
+                _this2.trainingScreen();
+            });
+            this.normalMode.addEventListener("click", function () {
+                console.log("mode: normal");
+                for (var i = 0; i < _this2.wcs.length; i += 1) {
+                    _this2.wcs[i].style.display = 'none';
+                }
+                /*let video = document.createElement('video')
+                video.id = 'localVideo'
+                video.srcObject = gstream
+                video.setAttribute('class', 'embed-responsive-item')
+                document.querySelector('#localDiv').appendChild(video)*/
+                video.style.display = "block";
+                video.play();
+
+                var talk = document.getElementById("mpb-button");
+                talk.innerHTML = "click to start speaking";
+                talk.addEventListener("click", function () {
+                    console.log("started speech recognition");
+                    speechrecognition();
+                });
+                var nameInput = document.getElementById("name");
+                name = nameInput.value;
+                name = name.toUpperCase() + ": ";
+                videoCall();
+            });
         }
-
-        //for peer of type not init
-        function FrontAnswer(offer) {
-            let peer = InitPeer('notInit')
-            peer.on('signal', (data) => {
-                socket.emit('Answer', data)
-            })
-            peer.signal(offer)
-            client.peer = peer
+    }, {
+        key: 'trainingScreen',
+        value: function trainingScreen() {
+            this.trainingListDiv.style.display = "block";
+            video.style.display = "block";
+            video.play();
+            this.videoPlaying = true;
         }
+    }, {
+        key: 'createTrainingBtn',
+        value: function createTrainingBtn() {
+            var _this3 = this;
 
-        function SignalAnswer(answer) {
-            client.gotAnswer = true
-            let peer = client.peer
-            peer.signal(answer)
+            this.nominee = new Array(words.length).fill(0);
+            var div = document.getElementById("action-btn");
+            div.innerHTML = "";
+
+            var trainButton = document.createElement('button');
+            trainButton.id = "train-button";
+            trainButton.innerText = "Training >>>";
+            div.appendChild(trainButton);
+
+            trainButton.addEventListener('mousedown', function () {
+
+                if (words.length == 3) {
+                    var proceed = confirm("You have not added any words.\n\nThe only query you can currently make is: 'hello'");
+
+                    if (!proceed) return;
+                }
+
+                console.log("ready to train");
+                _this3.createButtonList(true);
+                _this3.addWordForm.innerHTML = '';
+                _this3.loadKNN();
+                _this3.createVideoCallButton();
+                /*
+                      this.textLine.innerText = "Step 2: Train"
+                      let subtext = document.createElement('span')
+                subtext.innerHTML = "<br/>Time to associate signs with the words"
+                subtext.classList.add('subtext')
+                this.textLine.appendChild(subtext)
+                */
+                /*const callButton = document.createElement('button')//start video calling
+                callButton.innerText = "Video Call"
+                this.trainingListDiv.appendChild(callButton)
+                callButton.addEventListener('click', () => {
+                    this.trainingListDiv.style.display = "none"
+                    const trainStreamDiv = document.getElementById('train-stream')
+                    trainStreamDiv.style.display = "none"
+                    videoCall();
+                })*/
+            });
         }
+    }, {
+        key: 'loadKNN',
+        value: function loadKNN() {
+            return regeneratorRuntime.async(function loadKNN$(_context3) {
+                while (1) {
+                    switch (_context3.prev = _context3.next) {
+                        case 0:
 
-        function CreateVideo(stream) {
-            CreateDiv()
+                            knn = knnClassifier.create();
+                            _context3.next = 3;
+                            return regeneratorRuntime.awrap(mobilenet.load());
 
-            let video = document.createElement('video')
-            video.id = 'peerVideo'
-            video.srcObject = stream
-            video.setAttribute('class', 'embed-responsive-item')
-            document.querySelector('#peerDiv').appendChild(video)
-            video.play()
-            //wait for 1 sec
+                        case 3:
+                            featureExtractor = _context3.sent;
 
-            video.addEventListener('click', () => {
-                if (video.volume != 0)
-                    video.volume = 0
-                else
-                    video.volume = 1
-            })
+                            this.startTraining();
+                            /*featureExtractor =  await ml5.featureExtractor("MobileNet", () => {
+                              console.log("lodeded knn and mobilenet");
+                                this.startTraining()
+                            });*/
+                            // Load knn model
 
+                        case 5:
+                        case 'end':
+                            return _context3.stop();
+                    }
+                }
+            }, null, this);
         }
+    }, {
+        key: 'createButtonList',
+        value: function createButtonList(showBtn) {
+            //showBtn - true: show training btns, false:show only text
 
-        function SessionActive() {
-            document.write('Session Active. Please come back later')
-        }
+            // Clear List
+            this.exampleListDiv.innerHTML = "";
 
-
-
-        function RemovePeer() {
-            document.getElementById("peerVideo").remove();
-            document.getElementById("muteText").remove();
-            if (client.peer) {
-                client.peer.destroy()
+            // Create training buttons and info texts
+            for (var i = 0; i < words.length; i++) {
+                this.createButton(i, showBtn);
             }
         }
+    }, {
+        key: 'createButton',
+        value: function createButton(i, showBtn) {
+            var _this4 = this;
 
-        socket.on('BackOffer', FrontAnswer)
-        socket.on('BackAnswer', SignalAnswer)
-        socket.on('SessionActive', SessionActive)
-        socket.on('CreatePeer', MakePeer)
-        socket.on('Disconnect', RemovePeer)
+            var div = document.createElement('div');
+            this.exampleListDiv.appendChild(div);
+            div.style.marginBottom = '10px';
 
-    })
-    .catch(err => document.write(err))
+            // Create Word Text
+            var wordText = document.createElement('span');
 
-checkboxTheme.addEventListener('click', () => {
-    if (checkboxTheme.checked == true) {
-        document.body.style.backgroundColor = '#212529'
-        if (document.querySelector('#muteText')) {
-            document.querySelector('#muteText').style.color = "#fff"
+            if (i == 0 && !showBtn) {
+                wordText.innerText = words[i].toUpperCase();
+            } else if (i == words.length - 1 && !showBtn) {
+                wordText.innerText = words[i].toUpperCase();
+            } else {
+                wordText.innerText = words[i].toUpperCase() + " ";
+                wordText.style.fontWeight = "bold";
+            }
+
+            div.appendChild(wordText);
+
+            if (showBtn) {
+                // Create training button
+                var button = document.createElement('button');
+                button.innerText = "Add Example"; //"Train " + words[i].toUpperCase()
+                div.appendChild(button);
+
+                // Listen for mouse events when clicking the button
+                button.addEventListener('mousedown', function () {
+                    _this4.training = i;
+                    console.log(i);
+                });
+                button.addEventListener('mouseup', function () {
+                    return _this4.training = -1;
+                });
+
+                // Create clear button to emove training examples
+                var btn = document.createElement('button');
+                btn.innerText = "Clear"; //`Clear ${words[i].toUpperCase()}`
+                div.appendChild(btn);
+
+                btn.addEventListener('mousedown', function () {
+                    console.log("clear training data for this label");
+                    knn.clearLabel(i);
+                    _this4.infoTexts[i].innerText = " 0 examples";
+                });
+
+                // Create info text
+                var infoText = document.createElement('span');
+                infoText.innerText = " 0 examples";
+                div.appendChild(infoText);
+                this.infoTexts.push(infoText);
+            }
         }
-
-    }
-    else {
-        document.body.style.backgroundColor = '#fff'
-        if (document.querySelector('#muteText')) {
-            document.querySelector('#muteText').style.color = "#212529"
+    }, {
+        key: 'startTraining',
+        value: function startTraining() {
+            if (this.timer) {
+                this.stopTraining();
+            }
+            this.timer = requestAnimationFrame(this.train.bind(this));
         }
-    }
-}
-)
+    }, {
+        key: 'stopTraining',
+        value: function stopTraining() {
+            //video.pause();
+            cancelAnimationFrame(this.timer);
+        }
+    }, {
+        key: 'updateExampleCount',
+        value: function updateExampleCount() {
+            var p = document.getElementById('count');
+            p.innerText = 'Training: ' + words.length + ' words';
+        }
+    }, {
+        key: 'train',
+        value: function train() {
+            if (this.videoPlaying) {
+                // Get image data from video element
+                var image = tf.browser.fromPixels(video);
+                //console.log(image.dataSync())
+                var logits = featureExtractor.infer(image);
+                //logits.print();
+                // Train class if one of the buttons is held down
+                if (this.training != -1) {
+                    // Add current image to classifier
+                    knn.addExample(logits, this.training);
+                }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+                var exampleCount = knn.getClassExampleCount();
+                //console.log(exampleCount);
 
-function takepicture() {
-    var context = canvas.getContext('2d');
-    if (width && height) {
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(video, 0, 0, width, height);
+                //if(Math.max(...exampleCount) > 0){
+                for (var i = 0; i < words.length; i++) {
+                    if (exampleCount[i] > 0) {
+                        this.infoTexts[i].innerText = ' ' + exampleCount[i] + ' examples';
+                    }
+                }
+                //}
+            }
+            this.timer = requestAnimationFrame(this.train.bind(this));
+        }
+    }, {
+        key: 'createVideoCallButton',
+        value: function createVideoCallButton() {
+            var _this5 = this;
 
-      var data = canvas.toDataURL('image/png');
-      photo.setAttribute('src', data);
-    } else {
-      clearphoto();
-    }
-}
+            var div = document.getElementById("action-btn");
+            div.innerHTML = "";
+            var videoCallButton = document.createElement('button');
+            div.appendChild(videoCallButton);
+            videoCallButton.innerText = "Start VideoCalling >>>";
 
-  function clearphoto() {
-    var context = canvas.getContext('2d');
-    context.fillStyle = "#AAA";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+            var loadBtn = document.createElement('button');
+            div.appendChild(loadBtn);
+            loadBtn.innerText = "load model";
 
-    var data = canvas.toDataURL('image/png');
-    photo.setAttribute('src', data);
-  }
+            loadBtn.addEventListener("click", function () {
+                _this5.trainingListDiv.style.display = "none";
+                knn.load("model1.json");
+                videoCall();
+                _this5.createPredictBtn();
+            });
 
-function CreateDiv() {
-    let div = document.createElement('div')
-    div.setAttribute('class', "centered")
-    div.id = "muteText"
-    div.innerHTML = "Click to Mute/Unmute"
-    document.querySelector('#peerDiv').appendChild(div)
-    if (checkboxTheme.checked == true)
-        document.querySelector('#muteText').style.color = "#fff"
+            videoCallButton.addEventListener("click", function () {
+                _this5.trainingListDiv.style.display = "none";
+                videoCall();
+                _this5.createPredictBtn();
+            });
+        }
+    }, {
+        key: 'createPredictBtn',
+        value: function createPredictBtn() {
+            var _this6 = this;
+
+            var div = document.getElementById("action-btn");
+            div.innerHTML = "";
+            var saveBtn = document.createElement('button');
+            div.appendChild(saveBtn);
+            saveBtn.innerText = "save model";
+
+            saveBtn.addEventListener("click", function () {
+                knn.save("model1.json");
+            });
+
+            var predButton = document.getElementById("mpb-button");
+            predButton.innerHTML = "start predicting";
+
+            predButton.addEventListener('click', function () {
+                console.log("start predicting");
+                var exampleCount = knn.getClassExampleCount();
+                //console.log(exampleCount)
+                // check if training has been done
+                //if(Math.max(...exampleCount) > 0){
+                // if wake word has not been trained
+                if (exampleCount[0] == 0) {
+                    alert('You haven\'t added examples for the wake word HELLO');
+                    return;
+                }
+
+                // if the catchall phrase other hasnt been trained
+                if (exampleCount[words.length - 1] == 0) {
+                    alert('You haven\'t added examples for the catchall sign OTHER.\n\nCapture yourself in idle states e.g hands by your side, empty background etc.\n\nThis prevents words from being erroneously detected.');
+                    return;
+                }
+
+                var proceed = confirm("Remember to sign the wake word hello both at the beginning and end of your query.\n\ne.g Alexa, what's the weather (Alexa)");
+
+                if (!proceed) return;
+
+                //this.textLine.classList.remove("intro-steps")
+                //this.textLine.innerText = "Sign your query"
+                _this6.startPredicting();
+                /*} else {
+                  alert(
+                    `You haven't added any examples yet.\n\nPress and hold on the "Add Example" button next to each word while performing the sign in front of the webcam.`
+                    )
+                }*/
+            });
+        }
+    }, {
+        key: 'startPredicting',
+        value: function startPredicting() {
+            // stop training
+            if (this.timer) {
+                this.stopTraining();
+            }
+            //knn.load("model.json", () => {
+            this.pred = requestAnimationFrame(this.predict.bind(this));
+            //})
+        }
+    }, {
+        key: 'pausePredicting',
+        value: function pausePredicting() {
+            console.log("pause predicting");
+            cancelAnimationFrame(this.pred);
+        }
+    }, {
+        key: 'sleep',
+        value: function sleep(ms) {
+            return new Promise(function (resolve) {
+                return setTimeout(resolve, ms);
+            });
+        }
+    }, {
+        key: 'predict',
+        value: function predict() {
+            var _this7 = this;
+
+            var exampleCount, image, logits;
+            return regeneratorRuntime.async(function predict$(_context4) {
+                while (1) {
+                    switch (_context4.prev = _context4.next) {
+                        case 0:
+                            this.now = Date.now();
+                            this.elapsed = this.now - this.then;
+
+                            if (this.elapsed > this.fpsInterval) {
+                                this.then = this.now - this.elapsed % this.fpsInterval;
+                                if (this.videoPlaying) {
+                                    exampleCount = knn.getClassExampleCount();
+                                    image = tf.browser.fromPixels(video);
+                                    logits = featureExtractor.infer(image);
+                                    //if(Math.max(...exampleCount) > 0){
+
+                                    knn.predictClass(logits, 10).then(function (res) {
+                                        if (res.confidences[res.classIndex] > predictionThreshold && res.classIndex != _this7.previousPrediction && res.classIndex != words.length - 1) {
+                                            console.log(words[res.classIndex]);
+                                            _this7.previousPrediction = res.classIndex;
+
+                                            //console.log(words[res.classIndex])
+                                            /*if(res == 'send') {
+                                              socket.emit('chat', name + this.message);
+                                              this.meassage = [];
+                                            }
+                                            else  {   
+                                              this.message = this.message + ' ' + words[res.classIndex];
+                                            }*/
+                                        }
+                                    }).then(logits.dispose());
+                                    /*} else {
+                                      image.dispose()
+                                    }*/
+                                    /*.then((res) => */ /*{
+                                                        for(let i=0;i<words.length;i++){
+                                                        // if matches & is above threshold & isnt same as prev prediction
+                                                        // and is not the last class which is a catch all class
+                                                        if(res.classIndex == i && res.confidences[i] > predictionThreshold && res.classIndex != this.previousPrediction){
+                                                        console.log(words[i])
+                                                        if(words[i] == 'send')  {
+                                                                     socket.emit('chat', name + this.meassage)
+                                                        this.message = []
+                                                        }
+                                                        if(words[i] != 'other') {
+                                                        this.message = this.meassage + ' ' + words[i];
+                                                        }
+                                                                 // set previous prediction so it doesnt get called again
+                                                        this.previousPrediction = res.classIndex;
+                                                        }
+                                                        }
+                                                        }).then(() => logits.dispose())*/
+                                }
+                            }
+                            this.pred = requestAnimationFrame(this.predict.bind(this));
+
+                        case 4:
+                        case 'end':
+                            return _context4.stop();
+                    }
+                }
+            }, null, this);
+        }
+    }]);
+
+    return Main;
+}();
+
+function videoCall() {
+    var InitPeer, MakePeer, FrontAnswer, SignalAnswer, CreateVideo, SessionActive, RemovePeer;
+    return regeneratorRuntime.async(function videoCall$(_context5) {
+        while (1) {
+            switch (_context5.prev = _context5.next) {
+                case 0:
+                    RemovePeer = function RemovePeer() {
+                        document.getElementById("peerVideo").remove();
+                        if (client.peer) {
+                            client.peer.destroy();
+                        }
+                    };
+
+                    SessionActive = function SessionActive() {
+                        document.write('Session Active. Please come back later');
+                    };
+
+                    CreateVideo = function CreateVideo(stream) {
+                        var video = document.createElement('video');
+                        video.id = 'peerVideo';
+                        video.srcObject = stream;
+                        video.setAttribute('class', 'embed-responsive-item');
+                        document.querySelector('#peerDiv').appendChild(video);
+                        video.play();
+                        console.log("started session successfully");
+                    };
+
+                    SignalAnswer = function SignalAnswer(answer) {
+                        client.gotAnswer = true;
+                        var peer = client.peer;
+                        peer.signal(answer);
+                    };
+
+                    FrontAnswer = function FrontAnswer(offer) {
+                        var peer = InitPeer('notInit');
+                        peer.on('signal', function (data) {
+                            socket.emit('Answer', data);
+                        });
+                        peer.signal(offer);
+                        client.peer = peer;
+                    };
+
+                    MakePeer = function MakePeer() {
+                        client.gotAnswer = false;
+                        var peer = InitPeer('init');
+                        peer.on('signal', function (data) {
+                            if (!client.gotAnswer) {
+                                socket.emit('Offer', data);
+                            }
+                        });
+                        client.peer = peer;
+                    };
+
+                    InitPeer = function InitPeer(type) {
+                        var peer = new Peer({ initiator: type == 'init' ? true : false, stream: gstream, trickle: false });
+                        peer.on('stream', function (stream) {
+                            CreateVideo(stream);
+                        });
+                        peer.on('data', function (data) {
+                            var decodedData = new TextDecoder('utf-8').decode(data);
+                            var peervideo = document.querySelector('#peerVideo');
+                        });
+                        return peer;
+                    };
+
+                    socket.emit('NewClient');
+                    //used to initialize a peer
+
+
+                    //for peer of type init
+
+
+                    //for peer of type not init
+
+
+                    socket.on('BackOffer', FrontAnswer);
+                    socket.on('BackAnswer', SignalAnswer);
+                    socket.on('SessionActive', SessionActive);
+                    socket.on('CreatePeer', MakePeer);
+                    socket.on('Disconnect', RemovePeer);
+
+                case 13:
+                case 'end':
+                    return _context5.stop();
+            }
+        }
+    }, null, this);
 }
 
 /*speech recognition*/
-function speechrecognition(){
+function speechrecognition() {
     window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    var recognition = new SpeechRecognition();
     recognition.interimResults = true;
     recognition.lang = 'en-IN';
 
-    recognition.addEventListener('result', e => {
-        const transcript = Array.from(e.results)
-        .map(result => result[0])
-        .map(result => result.transcript)
-        .join('');
-        socket.emit('chat', transcript)
+    recognition.addEventListener('result', function (e) {
+        var transcript = Array.from(e.results).map(function (result) {
+            return result[0];
+        }).map(function (result) {
+            return result.transcript;
+        }).join('');
+        socket.emit('chat', name + transcript);
     });
     recognition.addEventListener('end', recognition.start);
     recognition.start();
 }
 
-socket.on('chat', function(data){
-    console.log(data)
-    output.innerHTML = data;
+socket.on('chat', function (data) {
+    var messageBox = document.getElementById("message");
+    messageBox.innerHTML = data;
 });
 
-},{"simple-peer":24}]},{},[31]);
+var main = null;
+window.addEventListener('load', function () {
+    main = new Main();
+    setupCamera();
+    main.welcomeScreen();
+});
+
+},{"simple-peer":25}]},{},[31]);
