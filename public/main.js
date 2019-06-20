@@ -7,8 +7,20 @@ var ctx2 = canvas2.getContext("2d");
 var blueSlider = document.getElementById("blueRange");
 var blueValue = document.getElementById("blueValue");
 blueValue.innerHTML = blueSlider.value;
-slider.oninput = function() {
-  output.innerHTML = this.value;
+var greenSlider = document.getElementById("greenRange");
+var greenValue = document.getElementById("greenValue");
+greenValue.innerHTML = greenSlider.value;
+var redSlider = document.getElementById("redRange");
+var redValue = document.getElementById("redValue");
+redValue.innerHTML = redSlider.value;
+blueSlider.oninput = function() {
+  blueValue.innerHTML = blueSlider.value;
+}
+greenSlider.oninput = function() {
+  greenValue.innerHTML = greenSlider.value;
+}
+redSlider.oninput = function() {
+  redValue.innerHTML = redSlider.value;
 }
 
 //const skinColorUpper = hue => new cv.Vec(hue, 0.8 * 255, 0.6 * 255);
@@ -74,7 +86,7 @@ const makeHandMask = (img) => {
   // filter by skin color
   cv.cvtColor(img, img, cv.COLOR_BGR2HLS);
   let low = new cv.Mat(img.rows, img.cols, img.type(), [0, 0.1 * 255, 0.05 * 255, 0]);
-  let high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), 0.8 * 255, 0.6 * 255, 255]);
+  let high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), parseFloat(greenSlider.value), parseFloat(redSlider.value), 255]);
   cv.inRange(img, low, high, img);
   cv.medianBlur(img, img, 5)
   cv.threshold(img, img, 200, 255, cv.THRESH_BINARY);
@@ -378,7 +390,7 @@ class Main  {
     train(){
         if(this.videoPlaying){
           // Get image data from video element
-          const image = tf.browser.fromPixels(video);
+          const image = tf.browser.fromPixels(canvas2);
           //console.log(image.dataSync())
           const logits = featureExtractor.infer(image);
           //logits.print();
@@ -508,7 +520,7 @@ class Main  {
           this.then = this.now - (this.elapsed % this.fpsInterval);
           if(this.videoPlaying){
             const exampleCount = knn.getClassExampleCount();
-            const image = tf.browser.fromPixels(video);
+            const image = tf.browser.fromPixels(canvas2);
             const logits = featureExtractor.infer(image)
             //if(Math.max(...exampleCount) > 0){
             knn.predictClass(logits, 10).then((res) => {
