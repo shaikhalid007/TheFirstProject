@@ -80,6 +80,7 @@ function computeFrame() {
   return;*/
   let frame = cv.imread(canvas1);
   cv.imshow('canvas2', makeHandMask(frame));
+  frame.delete();
 }
 
 const makeHandMask = (img) => {
@@ -89,6 +90,10 @@ const makeHandMask = (img) => {
   let high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), parseFloat(greenSlider.value), parseFloat(redSlider.value), 255]);
   cv.inRange(img, low, high, img);
   cv.medianBlur(img, img, 5)
+  let M = cv.Mat.ones(2, 2, cv.CV_8U);
+  let anchor = new cv.Point(-1, -1);
+  cv.morphologyEx(img, img, cv.MORPH_OPEN, M, anchor, 1,
+                  cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
   cv.threshold(img, img, 200, 255, cv.THRESH_BINARY);
   return img;
 };
