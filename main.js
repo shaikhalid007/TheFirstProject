@@ -4,6 +4,19 @@ const canvas1 = document.getElementById('canvas1');
 var ctx1 = canvas1.getContext("2d");
 const canvas2 = document.getElementById('canvas2');
 var ctx2 = canvas2.getContext("2d");
+
+
+var lblueSlider = document.getElementById("lblueRange");
+var lblueValue = document.getElementById("lblueValue");
+lblueValue.innerHTML = lblueSlider.value;
+var lgreenSlider = document.getElementById("lgreenRange");
+var lgreenValue = document.getElementById("lgreenValue");
+lgreenValue.innerHTML = lgreenSlider.value;
+var lredSlider = document.getElementById("lredRange");
+var lredValue = document.getElementById("lredValue");
+lredValue.innerHTML = lredSlider.value;
+
+
 var blueSlider = document.getElementById("blueRange");
 var blueValue = document.getElementById("blueValue");
 blueValue.innerHTML = blueSlider.value;
@@ -13,6 +26,8 @@ greenValue.innerHTML = greenSlider.value;
 var redSlider = document.getElementById("redRange");
 var redValue = document.getElementById("redValue");
 redValue.innerHTML = redSlider.value;
+
+
 blueSlider.oninput = function() {
   blueValue.innerHTML = blueSlider.value;
 }
@@ -23,6 +38,16 @@ redSlider.oninput = function() {
   redValue.innerHTML = redSlider.value;
 }
 
+
+lblueSlider.oninput = function() {
+  lblueValue.innerHTML = lblueSlider.value;
+}
+lgreenSlider.oninput = function() {
+  lgreenValue.innerHTML = lgreenSlider.value;
+}
+lredSlider.oninput = function() {
+  lredValue.innerHTML = lredSlider.value;
+}
 //const skinColorUpper = hue => new cv.Vec(hue, 0.8 * 255, 0.6 * 255);
 //const skinColorLower = hue => new cv.Vec(hue, 0.1 * 255, 0.05 * 255);
 
@@ -80,17 +105,21 @@ function computeFrame() {
   return;*/
   let frame = cv.imread(canvas1);
   cv.imshow('canvas2', makeHandMask(frame));
+  frame.delete();
 }
 
 const makeHandMask = (img) => {
   // filter by skin color
   cv.cvtColor(img, img, cv.COLOR_BGR2HLS);
-  let low = new cv.Mat(img.rows, img.cols, img.type(), [0, 0.1 * 255, 0.05 * 255, 0]);
+  let low = new cv.Mat(img.rows, img.cols, img.type(),  [parseFloat(lblueSlider.value), parseFloat(lgreenSlider.value), parseFloat(lredSlider.value), 255]);
   let high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), parseFloat(greenSlider.value), parseFloat(redSlider.value), 255]);
   cv.inRange(img, low, high, img);
   cv.medianBlur(img, img, 5)
-  //cv.adaptiveThreshold(img, img, 200, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 19, 2);
-  cv.Laplacian(img, img, cv.CV_8U, 5, 1, 0, cv.BORDER_DEFAULT);
+  let M = cv.Mat.ones(2, 2, cv.CV_8U);
+  let anchor = new cv.Point(-1, -1);
+  cv.morphologyEx(img, img, cv.MORPH_OPEN, M, anchor, 1,
+                  cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+  cv.threshold(img, img, 200, 255, cv.THRESH_BINARY);
   return img;
 };
 
