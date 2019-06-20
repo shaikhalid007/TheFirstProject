@@ -89,7 +89,8 @@ const makeHandMask = (img) => {
   let high = new cv.Mat(img.rows, img.cols, img.type(), [parseFloat(blueSlider.value), parseFloat(greenSlider.value), parseFloat(redSlider.value), 255]);
   cv.inRange(img, low, high, img);
   cv.medianBlur(img, img, 5)
-  cv.adaptiveThreshold(img, img, 200, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 19, 2);
+  //cv.adaptiveThreshold(img, img, 200, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 19, 2);
+  cv.Laplacian(img, img, cv.CV_8U, 5, 1, 0, cv.BORDER_DEFAULT);
   return img;
 };
 
